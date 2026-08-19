@@ -1,0 +1,2 @@
+const form=document.querySelector('#loginForm'), error=document.querySelector('#error');
+form.addEventListener('submit',async e=>{e.preventDefault();error.textContent='';const data=Object.fromEntries(new FormData(form));try{const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(data)});const body=await r.json();if(!r.ok)throw new Error(body.message);localStorage.setItem('hf_user',JSON.stringify(body.user));location.href='/dashboard.html';}catch(e){error.textContent=e.message}});
