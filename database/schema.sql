@@ -1,4 +1,10 @@
-/* Ejecutar en la base de datos HernandezFitness */
+IF DB_ID(N'DB_Hernandez_Fitness') IS NULL
+  CREATE DATABASE [DB_Hernandez_Fitness];
+GO
+
+/* Ejecutar en la base de datos DB_Hernandez_Fitness */
+USE [DB_Hernandez_Fitness];
+GO
 CREATE TABLE Roles (
   Id INT IDENTITY(1,1) PRIMARY KEY,
   Nombre NVARCHAR(30) NOT NULL UNIQUE,
@@ -23,6 +29,16 @@ CREATE TABLE Entrenadores (
   HorarioInicio TIME NOT NULL,
   HorarioFin TIME NOT NULL,
   CONSTRAINT CK_Entrenadores_Horario CHECK (HorarioInicio < HorarioFin)
+);
+
+CREATE TABLE HorariosEntrenadores (
+  Id INT IDENTITY(1,1) PRIMARY KEY,
+  IdEntrenador INT NOT NULL REFERENCES Entrenadores(Id),
+  DiaSemana TINYINT NOT NULL CHECK (DiaSemana BETWEEN 1 AND 7),
+  HoraInicio TIME NOT NULL,
+  HoraFin TIME NOT NULL,
+  CONSTRAINT CK_HorariosEntrenadores_Rango CHECK (HoraInicio < HoraFin),
+  CONSTRAINT UQ_HorariosEntrenadores_Dia UNIQUE(IdEntrenador, DiaSemana)
 );
 
 CREATE TABLE Clientes (
@@ -63,3 +79,24 @@ CREATE INDEX IX_Mediciones_ClienteFecha ON Mediciones(IdCliente, FechaMedicion D
 CREATE INDEX IX_Sesiones_EntrenadorFecha ON SesionesPersonalizadas(IdEntrenador, FechaHoraInicio);
 GO
 INSERT INTO Roles (Nombre) VALUES ('Administrador'), ('Entrenador');
+GO
+
+/* Usuarios de prueba. Contraseña para ambos: password */
+DECLARE @AdministradorId INT = (SELECT Id FROM Roles WHERE Nombre = 'Administrador');
+DECLARE @EntrenadorRolId INT = (SELECT Id FROM Roles WHERE Nombre = 'Entrenador');
+DECLARE @PasswordHash NVARCHAR(255) = '$2b$10$tCr1okKL6Ru70Y3zgtigtuQVo361io2oJ/tyXSfqIFB05DNVX/lxO';
+
+INSERT INTO Usuarios (Cedula, NombreCompleto, Email, PasswordHash, IdRol, EsAdministradorPrincipal)
+VALUES ('ADMIN-001', 'Andrey Administrador', 'andrey@hernandezfitness.local', @PasswordHash, @AdministradorId, 1);
+
+INSERT INTO Usuarios (Cedula, NombreCompleto, Email, PasswordHash, IdRol)
+VALUES ('ENT-001', 'Oscar Entrenador', 'oscar@hernandezfitness.local', @PasswordHash, @EntrenadorRolId);
+
+DECLARE @OscarEntrenadorUsuarioId INT = SCOPE_IDENTITY();
+
+INSERT INTO Entrenadores (IdUsuario, HorarioInicio, HorarioFin)
+VALUES (@OscarEntrenadorUsuarioId, '06:00', '18:00');
+
+DECLARE @OscarEntrenadorId INT = SCOPE_IDENTITY();
+INSERT INTO HorariosEntrenadores(IdEntrenador,DiaSemana,HoraInicio,HoraFin)
+SELECT @OscarEntrenadorId, Dia, '06:00', '18:00' FROM (VALUES(1),(2),(3),(4),(5)) D(Dia);

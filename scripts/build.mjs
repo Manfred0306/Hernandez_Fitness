@@ -6,6 +6,6 @@ const outDir = path.join(root, 'dist');
 const publicDir = path.join(root, 'public');
 
 await mkdir(outDir, { recursive: true });
-await cp(publicDir, path.join(outDir, 'public'), { recursive: true });
+await cp(publicDir, outDir, { recursive: true });
 
-console.log('Build complete: public assets copied to dist/public');
+console.log('Build complete: public assets copied to dist');

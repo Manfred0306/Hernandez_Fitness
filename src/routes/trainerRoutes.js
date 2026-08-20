@@ -1,2 +1,4 @@
-import { Router } from 'express'; import {schedule} from '../controllers/TrainerController.js'; import {authenticate,authorize} from '../middlewares/auth.js';
-const router=Router(); router.post('/sesiones',authenticate,authorize('Entrenador','Administrador'),schedule); export default router;
+import { Router } from 'express'; import * as C from '../controllers/TrainerController.js'; import {authenticate,authorize} from '../middlewares/auth.js';
+const router=Router(); router.use(authenticate); router.get('/',C.list); router.get('/sesiones',C.sessions);
+router.post('/',authorize('Administrador'),C.create); router.put('/:id',authorize('Administrador'),C.update); router.patch('/:id/estado',authorize('Administrador'),C.setStatus);
+router.post('/sesiones',authorize('Entrenador','Administrador'),C.schedule); export default router;
