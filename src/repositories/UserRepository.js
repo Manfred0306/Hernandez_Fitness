@@ -1,15 +1,14 @@
-import { getPool, sql } from '../config/db.js';
+import { query } from '../config/db.js';
 export default {
   async findByEmail(email) {
-    const db = await getPool();
-    return (await db.request().input('email', sql.NVarChar, email).query(`SELECT u.*, r.Nombre AS Rol, e.Id AS IdEntrenador
-      FROM Usuarios u JOIN Roles r ON r.Id=u.IdRol LEFT JOIN Entrenadores e ON e.IdUsuario=u.Id WHERE u.Email=@email`)).recordset[0];
+    const result = await query(`SELECT u.id AS "Id", u.cedula AS "Cedula", u.nombre_completo AS "NombreCompleto",
+      u.email AS "Email", u.password_hash AS "PasswordHash", u.activo AS "Activo", r.nombre AS "Rol",
+      e.id AS "IdEntrenador"
+      FROM usuarios u JOIN roles r ON r.id=u.rol_id LEFT JOIN entrenadores e ON e.usuario_id=u.id
+      WHERE lower(u.email)=lower($1)`, [email]);
+    return result.rows[0];
   },
   async updatePasswordHash(id, passwordHash) {
-    const db = await getPool();
-    await db.request()
-      .input('id', sql.Int, id)
-      .input('passwordHash', sql.NVarChar, passwordHash)
-      .query('UPDATE Usuarios SET PasswordHash=@passwordHash WHERE Id=@id');
+    await query('UPDATE usuarios SET password_hash=$1 WHERE id=$2', [passwordHash, id]);
   }
 };

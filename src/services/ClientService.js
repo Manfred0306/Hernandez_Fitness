@@ -7,7 +7,8 @@ export default {
   async byCedula(cedula) { const client = await ClientRepository.findByCedula(cedula); if (!client) throw new AppError('No existe un cliente con esa cédula.',404); return client; },
   async save(data, id) {
     if (!data.cedula || !data.nombreCompleto || !data.edad || !data.planAdquirido) throw new AppError('Complete los campos obligatorios.',400);
-    return ClientRepository.save(data, id);
+    try { return await ClientRepository.save(data, id); }
+    catch (error) { if (error.code === '23505') throw new AppError('Ya existe un cliente con esa cédula.',409); throw error; }
   },
   async setActive(id, active) { await this.get(id); await ClientRepository.setActive(id, active); }
 };

@@ -1,5 +1,5 @@
-import { getPool } from '../config/db.js';
-export default { async summary() { const db=await getPool(); return (await db.request().query(`SELECT
-  (SELECT COUNT(*) FROM Clientes WHERE Activo=1) AS clientesActivos,
-  (SELECT COUNT(*) FROM Mediciones WHERE YEAR(FechaMedicion)=YEAR(GETDATE()) AND MONTH(FechaMedicion)=MONTH(GETDATE())) AS medicionesMes,
-  (SELECT COUNT(*) FROM Entrenadores e JOIN Usuarios u ON u.Id=e.IdUsuario WHERE u.Activo=1) AS entrenadoresActivos`)).recordset[0]; } };
+import { query } from '../config/db.js';
+export default { async summary() { return (await query(`SELECT
+  (SELECT COUNT(*)::int FROM clientes WHERE activo) AS "clientesActivos",
+  (SELECT COUNT(*)::int FROM mediciones WHERE date_trunc('month',fecha_medicion)=date_trunc('month',CURRENT_DATE)) AS "medicionesMes",
+  (SELECT COUNT(*)::int FROM entrenadores e JOIN usuarios u ON u.id=e.usuario_id WHERE u.activo) AS "entrenadoresActivos"`)).rows[0]; } };

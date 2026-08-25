@@ -7,10 +7,20 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "build": "node scripts/build.mjs",
-    "preview": "node scripts/preview.mjs"
+    "preview": "node scripts/preview.mjs",
+    "db:start": "supabase start",
+    "db:reset": "supabase db reset"
   },
   "dependencies": {
-    "bcrypt": "^5.1.1", "cookie-parser": "^1.4.7", "cors": "^2.8.5",
-    "dotenv": "^16.4.7", "express": "^4.21.2", "jsonwebtoken": "^9.0.2", "mssql": "^11.0.1", "msnodesqlv8": "^4.5.0"
+    "bcrypt": "^5.1.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "supabase": "^2.115.0"
   }
 }

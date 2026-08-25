@@ -43,7 +43,7 @@ CREATE TABLE HorariosEntrenadores (
 
 CREATE TABLE Clientes (
   Id INT IDENTITY(1,1) PRIMARY KEY,
-  IdUsuario INT NULL UNIQUE REFERENCES Usuarios(Id),
+  IdUsuario INT NULL REFERENCES Usuarios(Id),
   Cedula NVARCHAR(30) NOT NULL UNIQUE,
   NombreCompleto NVARCHAR(150) NOT NULL,
   Edad TINYINT NOT NULL CONSTRAINT CK_Clientes_Edad CHECK (Edad BETWEEN 1 AND 120),
@@ -77,6 +77,7 @@ CREATE TABLE SesionesPersonalizadas (
 GO
 CREATE INDEX IX_Mediciones_ClienteFecha ON Mediciones(IdCliente, FechaMedicion DESC);
 CREATE INDEX IX_Sesiones_EntrenadorFecha ON SesionesPersonalizadas(IdEntrenador, FechaHoraInicio);
+CREATE UNIQUE INDEX UX_Clientes_IdUsuario_NotNull ON Clientes(IdUsuario) WHERE IdUsuario IS NOT NULL;
 GO
 INSERT INTO Roles (Nombre) VALUES ('Administrador'), ('Entrenador');
 GO
