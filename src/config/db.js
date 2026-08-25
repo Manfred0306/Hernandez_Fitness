@@ -1,10 +1,12 @@
 import dotenv from 'dotenv';
 import pg from 'pg';
+import { readFileSync } from 'node:fs';
 
 dotenv.config({ path: '.env.local', override: true });
 dotenv.config();
 
 const { Pool } = pg;
+const supabaseCa = readFileSync(new URL('../../database/prod-ca-2021.crt', import.meta.url), 'utf8');
 let pool;
 
 export function getPool() {
@@ -13,7 +15,8 @@ export function getPool() {
     pool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: process.env.DB_SSL === 'false' ? false : {
-        rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false'
+        ca: supabaseCa,
+        rejectUnauthorized: true
       },
       max: Number(process.env.DB_POOL_MAX || 3),
       idleTimeoutMillis: 20_000,
