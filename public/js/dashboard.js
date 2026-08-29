@@ -108,6 +108,19 @@ const days = [
   "Sábado",
   "Domingo",
 ];
+const formatTime = (value) =>
+  String(value ?? "").match(/(\d{2}:\d{2})/)?.[1] || "";
+const formatTrainerSchedule = (schedules = []) => {
+  const formatted = schedules
+    .map((schedule) => {
+      const start = formatTime(schedule.HoraInicio),
+        end = formatTime(schedule.HoraFin),
+        day = days[schedule.DiaSemana - 1];
+      return day && start && end ? `${day} ${start}–${end}` : "";
+    })
+    .filter(Boolean);
+  return formatted.length ? formatted.join(" · ") : "Sin horario";
+};
 function measurementHistory(items) {
   return `<div class="measurement-history">${items.map((m) => `<article><h3>${new Date(m.FechaMedicion).toLocaleDateString()}</h3><div class="detail-grid">${measurementFields.map((f) => `<span><small>${f}</small><b>${m[f] ?? "—"}</b></span>`).join("")}</div></article>`).join("") || "<p>No hay mediciones registradas.</p>"}</div>`;
 }
@@ -251,7 +264,7 @@ const getSchedule = (f) =>
     .filter(Boolean);
 async function entrenadores() {
   const list = await api("/entrenadores");
-  view.innerHTML = `<section class="grid"><form id="trainerForm" class="content"><h2 id="trainerTitle">Registrar entrenador</h2><input type="hidden" name="id"><input name="cedula" placeholder="Usuario / cédula" required><input name="nombreCompleto" placeholder="Nombre completo" required><input name="email" type="email" placeholder="Correo" required><input name="password" type="password" placeholder="Contraseña${" (opcional al editar)"}"><h3>Horario semanal</h3>${scheduleInputs()}<button>Guardar entrenador</button></form><section class="content"><h2>Entrenadores</h2><div class="list">${list.map((t) => `<article><b>${esc(t.NombreCompleto)}</b><span>${esc(t.Email)} · ${t.Activo ? "Activo" : "Inactivo"}</span><small>${t.Horarios.map((h) => days[h.DiaSemana - 1] + " " + String(h.HoraInicio).match(/T(\d\d:\d\d)/)?.[1] + "–" + String(h.HoraFin).match(/T(\d\d:\d\d)/)?.[1]).join(" · ")}</small><div class="row"><button data-edit-trainer="${t.Id}">Editar</button><button class="danger" data-status-trainer="${t.Id}" data-active="${!t.Activo}">${t.Activo ? "Inactivar" : "Reactivar"}</button></div></article>`).join("")}</div></section></section>`;
+  view.innerHTML = `<section class="grid"><form id="trainerForm" class="content"><h2 id="trainerTitle">Registrar entrenador</h2><input type="hidden" name="id"><input name="cedula" placeholder="Usuario / cédula" required><input name="nombreCompleto" placeholder="Nombre completo" required><input name="email" type="email" placeholder="Correo" required><input name="password" type="password" placeholder="Contraseña${" (opcional al editar)"}"><h3>Horario semanal</h3>${scheduleInputs()}<button>Guardar entrenador</button></form><section class="content"><h2>Entrenadores</h2><div class="list">${list.map((t) => `<article><b>${esc(t.NombreCompleto)}</b><span>${esc(t.Email)} · ${t.Activo ? "Activo" : "Inactivo"}</span><small>${formatTrainerSchedule(t.Horarios)}</small><div class="row"><button data-edit-trainer="${t.Id}">Editar</button><button class="danger" data-status-trainer="${t.Id}" data-active="${!t.Activo}">${t.Activo ? "Inactivar" : "Reactivar"}</button></div></article>`).join("")}</div></section></section>`;
   const trainerForm = $("trainerForm"),
     trainerTitle = $("trainerTitle");
   trainerForm.onsubmit = async (ev) => {
@@ -281,11 +294,12 @@ async function entrenadores() {
       el.nombreCompleto.value = t.NombreCompleto;
       el.email.value = t.Email;
       t.Horarios.forEach((h) => {
+        const start = formatTime(h.HoraInicio),
+          end = formatTime(h.HoraFin);
+        if (!start || !end) return;
         el[`day${h.DiaSemana}`].checked = true;
-        el[`start${h.DiaSemana}`].value =
-          String(h.HoraInicio).match(/T(\d\d:\d\d)/)?.[1] || "";
-        el[`end${h.DiaSemana}`].value =
-          String(h.HoraFin).match(/T(\d\d:\d\d)/)?.[1] || "";
+        el[`start${h.DiaSemana}`].value = start;
+        el[`end${h.DiaSemana}`].value = end;
       });
       trainerTitle.textContent = "Editar entrenador";
       trainerForm.scrollIntoView();

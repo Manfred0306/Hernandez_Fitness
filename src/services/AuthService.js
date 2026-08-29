@@ -7,14 +7,19 @@ const testEmails = new Set(['andrey@hernandezfitness.local', 'oscar@hernandezfit
 export default {
   async login(email, password) {
     const user = await UserRepository.findByEmail(email);
-    if (!user || !user.Activo) throw new AppError('Correo o contraseña incorrectos.', 401);
+    if (!user) throw new AppError('Correo o contraseña incorrectos.', 401);
     let passwordMatches = await bcrypt.compare(password, user.PasswordHash);
-    if (!passwordMatches && user.PasswordHash === legacyTestHash && testEmails.has(user.Email) && password === 'password') {
-      const passwordHash = await bcrypt.hash(password, 10);
-      await UserRepository.updatePasswordHash(user.Id, passwordHash);
+    const usesLegacyTestPassword = !passwordMatches && user.PasswordHash === legacyTestHash
+      && testEmails.has(user.Email) && password === 'password';
+    if (usesLegacyTestPassword) {
       passwordMatches = true;
     }
     if (!passwordMatches) throw new AppError('Correo o contraseña incorrectos.', 401);
+    if (!user.Activo) throw new AppError('Su usuario esta inactivo.', 403);
+    if (usesLegacyTestPassword) {
+      const passwordHash = await bcrypt.hash(password, 10);
+      await UserRepository.updatePasswordHash(user.Id, passwordHash);
+    }
     const token = jwt.sign({ id: user.Id, rol: user.Rol, idEntrenador: user.IdEntrenador }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' });
     return { token, user: { id: user.Id, nombre: user.NombreCompleto, rol: user.Rol, idEntrenador: user.IdEntrenador } };
   }
