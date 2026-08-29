@@ -121,8 +121,13 @@ const formatTrainerSchedule = (schedules = []) => {
     .filter(Boolean);
   return formatted.length ? formatted.join(" · ") : "Sin horario";
 };
+const formatMeasurementDate = (value) => {
+  const match = String(value ?? "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return "Fecha no disponible";
+  return new Date(+match[1], +match[2] - 1, +match[3]).toLocaleDateString();
+};
 function measurementHistory(items) {
-  return `<div class="measurement-history">${items.map((m) => `<article><h3>${new Date(m.FechaMedicion).toLocaleDateString()}</h3><div class="detail-grid">${measurementFields.map((f) => `<span><small>${f}</small><b>${m[f] ?? "—"}</b></span>`).join("")}</div></article>`).join("") || "<p>No hay mediciones registradas.</p>"}</div>`;
+  return `<div class="measurement-history">${items.map((m) => `<article><h3>${formatMeasurementDate(m.FechaMedicion)}</h3><p>Realizada por: <b>${esc(m.RealizadoPor || "No disponible")}</b></p><div class="detail-grid">${measurementFields.map((f) => `<span><small>${f}</small><b>${m[f] ?? "—"}</b></span>`).join("")}</div></article>`).join("") || "<p>No hay mediciones registradas.</p>"}</div>`;
 }
 async function inicio() {
   const d = await api("/dashboard");
@@ -196,10 +201,7 @@ async function clientes() {
   };
 }
 async function mediciones() {
-  const [clients, trainers] = await Promise.all([
-    api("/clientes"),
-    api("/entrenadores"),
-  ]);
+  const clients = await api("/clientes");
   view.innerHTML = `<section class="content"><h2>Seleccionar cliente</h2><input id="clientPicker" placeholder="Buscar por nombre o cédula"><div id="pickerResults" class="list"></div></section><section id="measurementArea"></section>`;
   const clientPicker = $("clientPicker"),
     pickerResults = $("pickerResults"),
@@ -224,7 +226,9 @@ async function mediciones() {
     if (!ev.target.dataset.pick) return;
     const c = clients.find((x) => x.Id == ev.target.dataset.pick),
       history = await api("/mediciones/cliente/" + c.Id);
-    measurementArea.innerHTML = `<section class="grid"><form id="measurementForm" class="content"><h2>Nueva medición</h2><p><b>${esc(c.NombreCompleto)}</b> · ${esc(c.Cedula)} · ${c.Edad} años</p><input type="hidden" name="idCliente" value="${c.Id}">${user.rol === "Administrador" ? `<select name="idEntrenador" required><option value="">Entrenador responsable</option>${trainers.filter((t) => t.Activo).map((t) => `<option value="${t.Id}">${esc(t.NombreCompleto)}</option>`)}</select>` : ""}<input name="fechaMedicion" type="date" value="${new Date().toISOString().slice(0, 10)}" required><div class="form-grid">${measurementFields.map((f) => `<label>${f}<input name="${f}" type="number" step=".01"></label>`).join("")}</div><button>Registrar medición</button></form><section class="content"><h2>Historial</h2>${measurementHistory(history)}</section></section>`;
+    const measurementAuthor =
+      user.rol === "Administrador" ? "Administrador" : user.nombre;
+    measurementArea.innerHTML = `<section class="grid"><form id="measurementForm" class="content"><h2>Nueva medición</h2><p><b>${esc(c.NombreCompleto)}</b> · ${esc(c.Cedula)} · ${c.Edad} años</p><p>Realizada por: <b>${esc(measurementAuthor)}</b></p><input type="hidden" name="idCliente" value="${c.Id}"><input name="fechaMedicion" type="date" value="${new Date().toISOString().slice(0, 10)}" required><div class="form-grid">${measurementFields.map((f) => `<label>${f}<input name="${f}" type="number" min="0" step=".01" required></label>`).join("")}</div><button>Registrar medición</button></form><section class="content"><h2>Historial</h2>${measurementHistory(history)}</section></section>`;
     const measurementForm = $("measurementForm");
     measurementForm.onsubmit = async (e) => {
       e.preventDefault();
