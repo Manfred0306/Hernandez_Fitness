@@ -161,7 +161,7 @@ async function inicio() {
     .join("")}</section>`;
 }
 function clientCards(list) {
-  return `<div class="list">${list.map((c) => `<article><b>${esc(c.NombreCompleto)}</b><span>${esc(c.Cedula)} · ${c.Edad} años · ${esc(c.PlanAdquirido)}</span><div class="row"><button data-history="${c.Id}">Ver mediciones</button>${user.rol === "Administrador" ? `<button data-edit-client="${c.Id}">Editar</button><button class="${c.Activo ? "danger" : "success"}" data-status-client="${c.Id}" data-active="${!c.Activo}">${c.Activo ? "Inactivar" : "Reactivar"}</button>` : ""}</div></article>`).join("")}</div>`;
+  return `<div class="list">${list.map((c) => `<article><b>${esc(c.NombreCompleto)}</b><span>${esc(c.Cedula)} · ${c.Edad} años · ${esc(c.PlanAdquirido)}</span><div class="row"><button data-history="${c.Id}">Ver mediciones</button><button data-measure-client="${c.Id}" ${c.Activo ? "" : "disabled"}>Registrar medición</button>${user.rol === "Administrador" ? `<button data-edit-client="${c.Id}">Editar</button><button class="${c.Activo ? "danger" : "success"}" data-status-client="${c.Id}" data-active="${!c.Activo}">${c.Activo ? "Inactivar" : "Reactivar"}</button>` : ""}</div></article>`).join("")}</div>`;
 }
 async function clientes() {
   const clients = await api("/clientes");
@@ -214,8 +214,11 @@ async function clientes() {
     const h = ev.target.dataset.history,
       edit = ev.target.dataset.editClient,
       status = ev.target.dataset.statusClient,
-      pageTarget = ev.target.dataset.clientPage;
-    if (pageTarget) {
+      pageTarget = ev.target.dataset.clientPage,
+      measurementClient = ev.target.dataset.measureClient;
+    if (measurementClient) {
+      location.href = `mediciones.html?cliente=${encodeURIComponent(measurementClient)}`;
+    } else if (pageTarget) {
       currentPage = Number(pageTarget);
       renderClientPage();
       clientSearch.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -284,10 +287,8 @@ async function mediciones() {
           .includes(clientPicker.value.toLowerCase()),
       ),
     );
-  pickerResults.onclick = async (ev) => {
-    if (!ev.target.dataset.pick) return;
-    const c = clients.find((x) => x.Id == ev.target.dataset.pick),
-      history = await api("/mediciones/cliente/" + c.Id);
+  const openClientMeasurement = async (c) => {
+    const history = await api("/mediciones/cliente/" + c.Id);
     const measurementAuthor =
       user.rol === "Administrador" ? "Administrador" : user.nombre;
     measurementArea.innerHTML = `<section class="grid"><form id="measurementForm" class="content"><h2>Nueva medición</h2><p><b>${esc(c.NombreCompleto)}</b> · ${esc(c.Cedula)} · ${c.Edad} años</p><p>Realizada por: <b>${esc(measurementAuthor)}</b></p><input type="hidden" name="idCliente" value="${c.Id}"><input name="fechaMedicion" type="date" value="${new Date().toISOString().slice(0, 10)}" required><div class="form-grid">${measurementFields.map((f) => `<label>${f}<input name="${f}" type="number" min="0" step=".01" required></label>`).join("")}</div><button>Registrar medición</button></form><section class="content"><h2>Historial</h2>${measurementHistory(history)}</section></section>`;
@@ -308,6 +309,20 @@ async function mediciones() {
       }
     };
   };
+  pickerResults.onclick = async (ev) => {
+    if (!ev.target.dataset.pick) return;
+    const c = clients.find((x) => x.Id == ev.target.dataset.pick);
+    if (c) await openClientMeasurement(c);
+  };
+  const requestedClientId = new URLSearchParams(location.search).get("cliente"),
+    requestedClient = clients.find(
+      (client) => String(client.Id) === requestedClientId && client.Activo,
+    );
+  if (requestedClient) {
+    clientPicker.value = `${requestedClient.NombreCompleto} ${requestedClient.Cedula}`;
+    draw([requestedClient]);
+    await openClientMeasurement(requestedClient);
+  }
 }
 const scheduleInputs = () =>
   days
@@ -441,7 +456,7 @@ async function sesiones() {
 }
 const screens = { inicio, clientes, mediciones, entrenadores, sesiones },
   page = document.body.dataset.page;
-quick.hidden = page !== "clientes";
+quick.hidden = true;
 logout.hidden = page !== "inicio";
 const closeSession = async () => {
   try {
