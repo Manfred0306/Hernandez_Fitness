@@ -165,11 +165,25 @@ function clientCards(list) {
 }
 async function clientes() {
   const clients = await api("/clientes");
-  view.innerHTML = `<section class="grid"><form id="clientForm" class="content"><h2 id="clientTitle">Registrar cliente</h2><input type="hidden" name="id"><input name="cedula" placeholder="Cédula" required><input name="nombreCompleto" placeholder="Nombre completo" required><input name="edad" type="number" min="1" max="120" placeholder="Edad" required><input name="planAdquirido" placeholder="Plan adquirido" required><textarea name="lesionesEnfermedades" placeholder="Lesiones o enfermedades"></textarea><button>Guardar cliente</button></form><section class="content"><h2>Clientes</h2><input id="clientSearch" placeholder="Buscar por nombre o cédula"><div id="clientList">${clientCards(clients)}</div></section></section>`;
+  view.innerHTML = `<section class="grid"><form id="clientForm" class="content"><h2 id="clientTitle">Registrar cliente</h2><input type="hidden" name="id"><input name="cedula" placeholder="Cédula" required><input name="nombreCompleto" placeholder="Nombre completo" required><input name="edad" type="number" min="1" max="120" placeholder="Edad" required><input name="planAdquirido" placeholder="Plan adquirido" required><textarea name="lesionesEnfermedades" placeholder="Lesiones o enfermedades"></textarea><button>Guardar cliente</button></form><section class="content"><h2>Clientes</h2><input id="clientSearch" placeholder="Buscar por nombre o cédula"><div id="clientList"></div><div id="clientPagination" class="pagination"></div></section></section>`;
   const clientForm = $("clientForm"),
     clientTitle = $("clientTitle"),
     clientSearch = $("clientSearch"),
-    clientList = $("clientList");
+    clientList = $("clientList"),
+    clientPagination = $("clientPagination"),
+    pageSize = 10;
+  let currentPage = 1,
+    filteredClients = clients;
+  const renderClientPage = () => {
+    const totalPages = Math.max(1, Math.ceil(filteredClients.length / pageSize));
+    currentPage = Math.min(Math.max(currentPage, 1), totalPages);
+    const start = (currentPage - 1) * pageSize;
+    clientList.innerHTML = clientCards(
+      filteredClients.slice(start, start + pageSize),
+    );
+    clientPagination.innerHTML = `<button type="button" data-client-page="${currentPage - 1}" ${currentPage === 1 ? "disabled" : ""}>Anterior</button><span>Página ${currentPage} de ${totalPages} · ${filteredClients.length} cliente${filteredClients.length === 1 ? "" : "s"}</span><button type="button" data-client-page="${currentPage + 1}" ${currentPage === totalPages ? "disabled" : ""}>Siguiente</button>`;
+  };
+  renderClientPage();
   clientForm.onsubmit = async (ev) => {
     ev.preventDefault();
     const d = Object.fromEntries(new FormData(clientForm)),
@@ -186,15 +200,26 @@ async function clientes() {
       message(x.message, 1);
     }
   };
-  clientSearch.oninput = async () =>
-    (clientList.innerHTML = clientCards(
-      await api("/clientes?buscar=" + encodeURIComponent(clientSearch.value)),
-    ));
+  clientSearch.oninput = () => {
+    const search = clientSearch.value.trim().toLocaleLowerCase("es");
+    filteredClients = clients.filter((client) =>
+      `${client.NombreCompleto} ${client.Cedula}`
+        .toLocaleLowerCase("es")
+        .includes(search),
+    );
+    currentPage = 1;
+    renderClientPage();
+  };
   view.onclick = async (ev) => {
     const h = ev.target.dataset.history,
       edit = ev.target.dataset.editClient,
-      status = ev.target.dataset.statusClient;
-    if (h) {
+      status = ev.target.dataset.statusClient,
+      pageTarget = ev.target.dataset.clientPage;
+    if (pageTarget) {
+      currentPage = Number(pageTarget);
+      renderClientPage();
+      clientSearch.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (h) {
       const c = await api("/clientes/" + h),
         m = await api("/mediciones/cliente/" + h);
       view.innerHTML = `<section class="content"><button id="backClients">Volver</button><h2>${esc(c.NombreCompleto)}</h2><p>${esc(c.Cedula)} · ${c.Edad} años</p>${measurementHistory(m)}</section>`;
@@ -370,13 +395,33 @@ async function entrenadores() {
   };
 }
 async function sesiones() {
-  const [c, t, s] = await Promise.all([
+  const [c, s] = await Promise.all([
     api("/clientes"),
-    api("/entrenadores"),
     api("/entrenadores/sesiones"),
   ]);
-  view.innerHTML = `<section class="grid"><form id="sessionForm" class="content"><h2>Agendar sesión</h2><select name="idCliente" required>${c.filter((x) => x.Activo).map((x) => `<option value="${x.Id}">${esc(x.NombreCompleto)}</option>`)}</select><select name="idEntrenador" required>${t.filter((x) => x.Activo).map((x) => `<option value="${x.Id}" ${x.Id == user.idEntrenador ? "selected" : ""}>${esc(x.NombreCompleto)}</option>`)}</select><input name="fechaHoraInicio" type="datetime-local" required><input name="fechaHoraFin" type="datetime-local" required><button>Agendar</button></form><section class="content"><h2>Agenda</h2>${s.map((x) => `<p>${esc(x.ClienteNombre)} · ${new Date(x.FechaHoraInicio).toLocaleString()}</p>`).join("")}</section></section>`;
-  const sessionForm = $("sessionForm");
+  const activeClients = c.filter((client) => client.Activo),
+    trainers =
+      user.rol === "Administrador" ? await api("/entrenadores") : [],
+    trainerField =
+      user.rol === "Entrenador"
+        ? `<label class="field-label">Entrenador</label><div class="readonly-field">${esc(user.nombre)}</div><input type="hidden" name="idEntrenador" value="${user.idEntrenador}"><small class="field-note">Asignado automáticamente según la sesión iniciada.</small>`
+        : `<label class="field-label" for="sessionTrainer">Entrenador</label><select id="sessionTrainer" name="idEntrenador" required><option value="">Seleccione un entrenador</option>${trainers.filter((trainer) => trainer.Activo).map((trainer) => `<option value="${trainer.Id}">${esc(trainer.NombreCompleto)}</option>`)}</select>`;
+  const clientOptions = (clients) =>
+    `<option value="">Seleccione un cliente</option>${clients.map((client) => `<option value="${client.Id}">${esc(client.NombreCompleto)} · ${esc(client.Cedula)}</option>`).join("")}`;
+  view.innerHTML = `<section class="grid"><form id="sessionForm" class="content"><h2>Agendar sesión</h2><label class="field-label" for="sessionClientSearch">Buscar cliente</label><input id="sessionClientSearch" type="search" placeholder="Escriba el nombre o la cédula"><label class="field-label" for="sessionClient">Cliente</label><select id="sessionClient" name="idCliente" required>${clientOptions(activeClients)}</select>${trainerField}<label class="field-label" for="sessionStart">Inicio</label><input id="sessionStart" name="fechaHoraInicio" type="datetime-local" required><label class="field-label" for="sessionEnd">Fin</label><input id="sessionEnd" name="fechaHoraFin" type="datetime-local" required><button>Agendar</button></form><section class="content"><h2>Agenda</h2>${s.map((x) => `<p>${esc(x.ClienteNombre)} · ${new Date(x.FechaHoraInicio).toLocaleString()}</p>`).join("") || "<p>No hay sesiones agendadas.</p>"}</section></section>`;
+  const sessionForm = $("sessionForm"),
+    sessionClientSearch = $("sessionClientSearch"),
+    sessionClient = $("sessionClient");
+  sessionClientSearch.oninput = () => {
+    const search = sessionClientSearch.value.trim().toLocaleLowerCase("es");
+    sessionClient.innerHTML = clientOptions(
+      activeClients.filter((client) =>
+        `${client.NombreCompleto} ${client.Cedula}`
+          .toLocaleLowerCase("es")
+          .includes(search),
+      ),
+    );
+  };
   sessionForm.onsubmit = async (ev) => {
     ev.preventDefault();
     const data = Object.fromEntries(new FormData(sessionForm));

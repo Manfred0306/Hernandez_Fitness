@@ -52,9 +52,8 @@ export default {
   sessions: id => TrainerRepository.sessions(id),
 
   async scheduleSession({ idEntrenador, idCliente, fechaHoraInicio, fechaHoraFin }, actor) {
-    if (actor.rol === 'Entrenador' && Number(actor.idEntrenador) !== Number(idEntrenador)) {
-      throw new AppError('Solo puede agendar sesiones propias.', 403);
-    }
+    if (actor.rol === 'Entrenador') idEntrenador = actor.idEntrenador;
+    if (!idEntrenador) throw new AppError('Seleccione un entrenador.', 400);
     const start = new Date(fechaHoraInicio);
     const end = new Date(fechaHoraFin);
     if (Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf()) || !(start < end)) {
