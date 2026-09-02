@@ -68,6 +68,27 @@ const esc = (x) =>
     notice.textContent = x;
     notice.className = b ? "error" : "ok";
   };
+const statusDialog = document.createElement("dialog");
+statusDialog.className = "status-modal";
+statusDialog.innerHTML = `<form method="dialog"><span class="modal-eyebrow">CONFIRMACIÓN</span><h2 id="statusModalTitle"></h2><p id="statusModalText"></p><div class="modal-actions"><button value="cancel" class="modal-cancel">Cancelar</button><button value="confirm" id="statusModalConfirm">Confirmar</button></div></form>`;
+document.body.appendChild(statusDialog);
+function confirmStatusChange({ name, entity, activate }) {
+  const action = activate ? "reactivar" : "inactivar";
+  $("statusModalTitle").textContent = `${activate ? "Reactivar" : "Inactivar"} ${entity}`;
+  $("statusModalText").textContent = `¿Confirma que desea ${action} a ${name}?`;
+  const confirmButton = $("statusModalConfirm");
+  confirmButton.className = activate ? "success" : "danger";
+  confirmButton.textContent = activate ? "Sí, reactivar" : "Sí, inactivar";
+  statusDialog.returnValue = "";
+  statusDialog.showModal();
+  return new Promise((resolve) => {
+    statusDialog.addEventListener(
+      "close",
+      () => resolve(statusDialog.returnValue === "confirm"),
+      { once: true },
+    );
+  });
+}
 async function api(path, options = {}) {
   const response = await fetch("/api" + path, {
     credentials: "include",
@@ -140,7 +161,7 @@ async function inicio() {
     .join("")}</section>`;
 }
 function clientCards(list) {
-  return `<div class="list">${list.map((c) => `<article><b>${esc(c.NombreCompleto)}</b><span>${esc(c.Cedula)} · ${c.Edad} años · ${esc(c.PlanAdquirido)}</span><div class="row"><button data-history="${c.Id}">Ver mediciones</button>${user.rol === "Administrador" ? `<button data-edit-client="${c.Id}">Editar</button><button class="danger" data-status-client="${c.Id}" data-active="${!c.Activo}">${c.Activo ? "Inactivar" : "Reactivar"}</button>` : ""}</div></article>`).join("")}</div>`;
+  return `<div class="list">${list.map((c) => `<article><b>${esc(c.NombreCompleto)}</b><span>${esc(c.Cedula)} · ${c.Edad} años · ${esc(c.PlanAdquirido)}</span><div class="row"><button data-history="${c.Id}">Ver mediciones</button>${user.rol === "Administrador" ? `<button data-edit-client="${c.Id}">Editar</button><button class="${c.Activo ? "danger" : "success"}" data-status-client="${c.Id}" data-active="${!c.Activo}">${c.Activo ? "Inactivar" : "Reactivar"}</button>` : ""}</div></article>`).join("")}</div>`;
 }
 async function clientes() {
   const clients = await api("/clientes");
@@ -192,11 +213,27 @@ async function clientes() {
       clientTitle.textContent = "Editar cliente";
       clientForm.scrollIntoView();
     } else if (status) {
-      await api(`/clientes/${status}/estado`, {
-        method: "PATCH",
-        body: JSON.stringify({ activo: ev.target.dataset.active === "true" }),
-      });
-      clientes();
+      const selectedClient = clients.find((client) => client.Id == status),
+        activate = ev.target.dataset.active === "true";
+      if (
+        !selectedClient ||
+        !(await confirmStatusChange({
+          name: selectedClient.NombreCompleto,
+          entity: "cliente",
+          activate,
+        }))
+      )
+        return;
+      try {
+        await api(`/clientes/${status}/estado`, {
+          method: "PATCH",
+          body: JSON.stringify({ activo: activate }),
+        });
+        message(`Cliente ${activate ? "reactivado" : "inactivado"}.`);
+        clientes();
+      } catch (error) {
+        message(error.message, 1);
+      }
     }
   };
 }
@@ -268,7 +305,7 @@ const getSchedule = (f) =>
     .filter(Boolean);
 async function entrenadores() {
   const list = await api("/entrenadores");
-  view.innerHTML = `<section class="grid"><form id="trainerForm" class="content"><h2 id="trainerTitle">Registrar entrenador</h2><input type="hidden" name="id"><input name="cedula" placeholder="Usuario / cédula" required><input name="nombreCompleto" placeholder="Nombre completo" required><input name="email" type="email" placeholder="Correo" required><input name="password" type="password" placeholder="Contraseña${" (opcional al editar)"}"><h3>Horario semanal</h3>${scheduleInputs()}<button>Guardar entrenador</button></form><section class="content"><h2>Entrenadores</h2><div class="list">${list.map((t) => `<article><b>${esc(t.NombreCompleto)}</b><span>${esc(t.Email)} · ${t.Activo ? "Activo" : "Inactivo"}</span><small>${formatTrainerSchedule(t.Horarios)}</small><div class="row"><button data-edit-trainer="${t.Id}">Editar</button><button class="danger" data-status-trainer="${t.Id}" data-active="${!t.Activo}">${t.Activo ? "Inactivar" : "Reactivar"}</button></div></article>`).join("")}</div></section></section>`;
+  view.innerHTML = `<section class="grid"><form id="trainerForm" class="content"><h2 id="trainerTitle">Registrar entrenador</h2><input type="hidden" name="id"><input name="cedula" placeholder="Usuario / cédula" required><input name="nombreCompleto" placeholder="Nombre completo" required><input name="email" type="email" placeholder="Correo" required><input name="password" type="password" placeholder="Contraseña${" (opcional al editar)"}"><h3>Horario semanal</h3>${scheduleInputs()}<button>Guardar entrenador</button></form><section class="content"><h2>Entrenadores</h2><div class="list">${list.map((t) => `<article><b>${esc(t.NombreCompleto)}</b><span>${esc(t.Email)} · ${t.Activo ? "Activo" : "Inactivo"}</span><small>${formatTrainerSchedule(t.Horarios)}</small><div class="row"><button data-edit-trainer="${t.Id}">Editar</button><button class="${t.Activo ? "danger" : "success"}" data-status-trainer="${t.Id}" data-active="${!t.Activo}">${t.Activo ? "Inactivar" : "Reactivar"}</button></div></article>`).join("")}</div></section></section>`;
   const trainerForm = $("trainerForm"),
     trainerTitle = $("trainerTitle");
   trainerForm.onsubmit = async (ev) => {
@@ -308,11 +345,27 @@ async function entrenadores() {
       trainerTitle.textContent = "Editar entrenador";
       trainerForm.scrollIntoView();
     } else if (status) {
-      await api(`/entrenadores/${status}/estado`, {
-        method: "PATCH",
-        body: JSON.stringify({ activo: ev.target.dataset.active === "true" }),
-      });
-      entrenadores();
+      const selectedTrainer = list.find((trainer) => trainer.Id == status),
+        activate = ev.target.dataset.active === "true";
+      if (
+        !selectedTrainer ||
+        !(await confirmStatusChange({
+          name: selectedTrainer.NombreCompleto,
+          entity: "entrenador",
+          activate,
+        }))
+      )
+        return;
+      try {
+        await api(`/entrenadores/${status}/estado`, {
+          method: "PATCH",
+          body: JSON.stringify({ activo: activate }),
+        });
+        message(`Entrenador ${activate ? "reactivado" : "inactivado"}.`);
+        entrenadores();
+      } catch (error) {
+        message(error.message, 1);
+      }
     }
   };
 }
