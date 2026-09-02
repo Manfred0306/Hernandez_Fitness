@@ -51,6 +51,17 @@ export default {
   setActive: (id, active) => TrainerRepository.setActive(id, active),
   sessions: id => TrainerRepository.sessions(id),
 
+  async setSessionStatus(id, status, actor) {
+    if (!['Completado', 'Cancelado'].includes(status)) {
+      throw new AppError('El estado de la sesión no es válido.', 400);
+    }
+    const trainerId = actor.rol === 'Entrenador' ? actor.idEntrenador : null;
+    const updated = await TrainerRepository.setSessionStatus(id, status, trainerId);
+    if (!updated) {
+      throw new AppError('La sesión no existe, no le pertenece o ya no está agendada.', 409);
+    }
+  },
+
   async scheduleSession({ idEntrenador, idCliente, fechaHoraInicio, fechaHoraFin }, actor) {
     if (actor.rol === 'Entrenador') idEntrenador = actor.idEntrenador;
     if (!idEntrenador) throw new AppError('Seleccione un entrenador.', 400);

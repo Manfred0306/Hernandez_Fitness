@@ -61,8 +61,15 @@ document.addEventListener("keydown", (event) => {
 });
 const esc = (x) =>
     String(x ?? "").replace(
-      /[&<>]/g,
-      (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c],
+      /[&<>"']/g,
+      (c) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        })[c],
     ),
   message = (x, b = 0) => {
     notice.textContent = x;
@@ -79,6 +86,25 @@ function confirmStatusChange({ name, entity, activate }) {
   const confirmButton = $("statusModalConfirm");
   confirmButton.className = activate ? "success" : "danger";
   confirmButton.textContent = activate ? "Sí, reactivar" : "Sí, inactivar";
+  statusDialog.returnValue = "";
+  statusDialog.showModal();
+  return new Promise((resolve) => {
+    statusDialog.addEventListener(
+      "close",
+      () => resolve(statusDialog.returnValue === "confirm"),
+      { once: true },
+    );
+  });
+}
+function confirmSessionChange({ client, status }) {
+  const cancel = status === "Cancelado";
+  $("statusModalTitle").textContent = cancel
+    ? "Cancelar sesión"
+    : "Completar sesión";
+  $("statusModalText").textContent = `¿Confirma que desea marcar la sesión de ${client} como ${status.toLowerCase()}?`;
+  const confirmButton = $("statusModalConfirm");
+  confirmButton.className = cancel ? "danger" : "success";
+  confirmButton.textContent = cancel ? "Sí, cancelar" : "Sí, completar";
   statusDialog.returnValue = "";
   statusDialog.showModal();
   return new Promise((resolve) => {
@@ -165,13 +191,21 @@ function clientCards(list) {
 }
 async function clientes() {
   const clients = await api("/clientes");
-  view.innerHTML = `<section class="grid"><form id="clientForm" class="content"><h2 id="clientTitle">Registrar cliente</h2><input type="hidden" name="id"><input name="cedula" placeholder="Cédula" required><input name="nombreCompleto" placeholder="Nombre completo" required><input name="edad" type="number" min="1" max="120" placeholder="Edad" required><input name="planAdquirido" placeholder="Plan adquirido" required><textarea name="lesionesEnfermedades" placeholder="Lesiones o enfermedades"></textarea><button>Guardar cliente</button></form><section class="content"><h2>Clientes</h2><input id="clientSearch" placeholder="Buscar por nombre o cédula"><div id="clientList"></div><div id="clientPagination" class="pagination"></div></section></section>`;
+  view.innerHTML = `<section class="grid"><form id="clientForm" class="content"><h2 id="clientTitle">Registrar cliente</h2><input type="hidden" name="id"><input name="cedula" placeholder="Cédula" required><input name="nombreCompleto" placeholder="Nombre completo" required><input name="edad" type="number" min="1" max="120" placeholder="Edad" required><input name="planAdquirido" placeholder="Plan adquirido" required><textarea name="lesionesEnfermedades" placeholder="Lesiones o enfermedades"></textarea><div class="form-actions"><button>Guardar cliente</button><button id="cancelClientEdit" class="secondary" type="button" hidden>Cancelar</button></div></form><section class="content"><h2>Clientes</h2><input id="clientSearch" placeholder="Buscar por nombre o cédula"><div id="clientList"></div><div id="clientPagination" class="pagination"></div></section></section>`;
   const clientForm = $("clientForm"),
     clientTitle = $("clientTitle"),
+    cancelClientEdit = $("cancelClientEdit"),
     clientSearch = $("clientSearch"),
     clientList = $("clientList"),
     clientPagination = $("clientPagination"),
     pageSize = 10;
+  const resetClientEdit = () => {
+    clientForm.reset();
+    clientForm.elements.id.value = "";
+    clientTitle.textContent = "Registrar cliente";
+    cancelClientEdit.hidden = true;
+  };
+  cancelClientEdit.onclick = resetClientEdit;
   let currentPage = 1,
     filteredClients = clients;
   const renderClientPage = () => {
@@ -239,6 +273,7 @@ async function clientes() {
       }))
         if (clientForm.elements[k]) clientForm.elements[k].value = val ?? "";
       clientTitle.textContent = "Editar cliente";
+      cancelClientEdit.hidden = false;
       clientForm.scrollIntoView();
     } else if (status) {
       const selectedClient = clients.find((client) => client.Id == status),
@@ -345,9 +380,17 @@ const getSchedule = (f) =>
     .filter(Boolean);
 async function entrenadores() {
   const list = await api("/entrenadores");
-  view.innerHTML = `<section class="grid"><form id="trainerForm" class="content"><h2 id="trainerTitle">Registrar entrenador</h2><input type="hidden" name="id"><input name="cedula" placeholder="Usuario / cédula" required><input name="nombreCompleto" placeholder="Nombre completo" required><input name="email" type="email" placeholder="Correo" required><input name="password" type="password" placeholder="Contraseña${" (opcional al editar)"}"><h3>Horario semanal</h3>${scheduleInputs()}<button>Guardar entrenador</button></form><section class="content"><h2>Entrenadores</h2><div class="list">${list.map((t) => `<article><b>${esc(t.NombreCompleto)}</b><span>${esc(t.Email)} · ${t.Activo ? "Activo" : "Inactivo"}</span><small>${formatTrainerSchedule(t.Horarios)}</small><div class="row"><button data-edit-trainer="${t.Id}">Editar</button><button class="${t.Activo ? "danger" : "success"}" data-status-trainer="${t.Id}" data-active="${!t.Activo}">${t.Activo ? "Inactivar" : "Reactivar"}</button></div></article>`).join("")}</div></section></section>`;
+  view.innerHTML = `<section class="grid"><form id="trainerForm" class="content"><h2 id="trainerTitle">Registrar entrenador</h2><input type="hidden" name="id"><input name="cedula" placeholder="Usuario / cédula" required><input name="nombreCompleto" placeholder="Nombre completo" required><input name="email" type="email" placeholder="Correo" required><input name="password" type="password" placeholder="Contraseña${" (opcional al editar)"}"><h3>Horario semanal</h3>${scheduleInputs()}<div class="form-actions"><button>Guardar entrenador</button><button id="cancelTrainerEdit" class="secondary" type="button" hidden>Cancelar</button></div></form><section class="content"><h2>Entrenadores</h2><div class="list">${list.map((t) => `<article><b>${esc(t.NombreCompleto)}</b><span>${esc(t.Email)} · ${t.Activo ? "Activo" : "Inactivo"}</span><small>${formatTrainerSchedule(t.Horarios)}</small><div class="row"><button data-edit-trainer="${t.Id}">Editar</button><button class="${t.Activo ? "danger" : "success"}" data-status-trainer="${t.Id}" data-active="${!t.Activo}">${t.Activo ? "Inactivar" : "Reactivar"}</button></div></article>`).join("")}</div></section></section>`;
   const trainerForm = $("trainerForm"),
-    trainerTitle = $("trainerTitle");
+    trainerTitle = $("trainerTitle"),
+    cancelTrainerEdit = $("cancelTrainerEdit");
+  const resetTrainerEdit = () => {
+    trainerForm.reset();
+    trainerForm.elements.id.value = "";
+    trainerTitle.textContent = "Registrar entrenador";
+    cancelTrainerEdit.hidden = true;
+  };
+  cancelTrainerEdit.onclick = resetTrainerEdit;
   trainerForm.onsubmit = async (ev) => {
     ev.preventDefault();
     const data = Object.fromEntries(new FormData(trainerForm)),
@@ -368,6 +411,7 @@ async function entrenadores() {
     const id = ev.target.dataset.editTrainer,
       status = ev.target.dataset.statusTrainer;
     if (id) {
+      resetTrainerEdit();
       const t = list.find((x) => x.Id == id),
         el = trainerForm.elements;
       el.id.value = t.Id;
@@ -383,6 +427,7 @@ async function entrenadores() {
         el[`end${h.DiaSemana}`].value = end;
       });
       trainerTitle.textContent = "Editar entrenador";
+      cancelTrainerEdit.hidden = false;
       trainerForm.scrollIntoView();
     } else if (status) {
       const selectedTrainer = list.find((trainer) => trainer.Id == status),
@@ -423,7 +468,24 @@ async function sesiones() {
         : `<label class="field-label" for="sessionTrainer">Entrenador</label><select id="sessionTrainer" name="idEntrenador" required><option value="">Seleccione un entrenador</option>${trainers.filter((trainer) => trainer.Activo).map((trainer) => `<option value="${trainer.Id}">${esc(trainer.NombreCompleto)}</option>`)}</select>`;
   const clientOptions = (clients) =>
     `<option value="">Seleccione un cliente</option>${clients.map((client) => `<option value="${client.Id}">${esc(client.NombreCompleto)} · ${esc(client.Cedula)}</option>`).join("")}`;
-  view.innerHTML = `<section class="grid"><form id="sessionForm" class="content"><h2>Agendar sesión</h2><label class="field-label" for="sessionClientSearch">Buscar cliente</label><input id="sessionClientSearch" type="search" placeholder="Escriba el nombre o la cédula"><label class="field-label" for="sessionClient">Cliente</label><select id="sessionClient" name="idCliente" required>${clientOptions(activeClients)}</select>${trainerField}<label class="field-label" for="sessionStart">Inicio</label><input id="sessionStart" name="fechaHoraInicio" type="datetime-local" required><label class="field-label" for="sessionEnd">Fin</label><input id="sessionEnd" name="fechaHoraFin" type="datetime-local" required><button>Agendar</button></form><section class="content"><h2>Agenda</h2>${s.map((x) => `<p>${esc(x.ClienteNombre)} · ${new Date(x.FechaHoraInicio).toLocaleString()}</p>`).join("") || "<p>No hay sesiones agendadas.</p>"}</section></section>`;
+  const formatSessionDateTime = (value) =>
+    new Intl.DateTimeFormat("es-CR", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  const sessionCards = s
+    .map((x) => {
+      const status = x.Estado || "Agendado",
+        statusClass =
+          status === "Completado"
+            ? "completed"
+            : status === "Cancelado"
+              ? "cancelled"
+              : "";
+      return `<article class="session-card"><small>CLIENTE</small><h3>${esc(x.ClienteNombre)}</h3><p>Entrenador: <b>${esc(x.EntrenadorNombre)}</b></p><p>Inicio: <b>${formatSessionDateTime(x.FechaHoraInicio)}</b></p><p>Fin: <b>${formatSessionDateTime(x.FechaHoraFin)}</b></p><span class="session-status ${statusClass}">${esc(status)}</span>${status === "Agendado" ? `<div class="row"><button class="success" data-session-status="Completado" data-session-id="${x.Id}" data-session-client="${esc(x.ClienteNombre)}">Completar</button><button class="danger" data-session-status="Cancelado" data-session-id="${x.Id}" data-session-client="${esc(x.ClienteNombre)}">Cancelar</button></div>` : ""}</article>`;
+    })
+    .join("");
+  view.innerHTML = `<section class="grid"><form id="sessionForm" class="content"><h2>Agendar sesión</h2><label class="field-label" for="sessionClientSearch">Buscar cliente</label><input id="sessionClientSearch" type="search" placeholder="Escriba el nombre o la cédula"><label class="field-label" for="sessionClient">Cliente</label><select id="sessionClient" name="idCliente" required>${clientOptions(activeClients)}</select>${trainerField}<label class="field-label" for="sessionStart">Inicio</label><input id="sessionStart" name="fechaHoraInicio" type="datetime-local" required><label class="field-label" for="sessionEnd">Fin</label><input id="sessionEnd" name="fechaHoraFin" type="datetime-local" required><button>Agendar</button></form><section class="content"><h2>Agenda</h2><div class="session-list">${sessionCards || "<p>No hay sesiones agendadas.</p>"}</div></section></section>`;
   const sessionForm = $("sessionForm"),
     sessionClientSearch = $("sessionClientSearch"),
     sessionClient = $("sessionClient");
@@ -451,6 +513,28 @@ async function sesiones() {
       sesiones();
     } catch (x) {
       message(x.message, 1);
+    }
+  };
+  view.onclick = async (ev) => {
+    const sessionId = ev.target.dataset.sessionId,
+      status = ev.target.dataset.sessionStatus;
+    if (!sessionId || !status) return;
+    if (
+      !(await confirmSessionChange({
+        client: ev.target.dataset.sessionClient,
+        status,
+      }))
+    )
+      return;
+    try {
+      await api(`/entrenadores/sesiones/${sessionId}/estado`, {
+        method: "PATCH",
+        body: JSON.stringify({ estado: status }),
+      });
+      message(`Sesión marcada como ${status.toLowerCase()}.`);
+      sesiones();
+    } catch (error) {
+      message(error.message, 1);
     }
   };
 }

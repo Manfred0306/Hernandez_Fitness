@@ -49,3 +49,11 @@ export async function sessions(req, res, next) {
     next(e);
   }
 }
+export async function setSessionStatus(req, res, next) {
+  try {
+    await TrainerService.setSessionStatus(req.params.id, req.body.estado, req.user);
+    res.json({ message: `Sesión marcada como ${req.body.estado.toLowerCase()}.` });
+  } catch (e) {
+    next(e);
+  }
+}

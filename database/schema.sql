@@ -72,7 +72,9 @@ CREATE TABLE SesionesPersonalizadas (
   IdCliente INT NOT NULL REFERENCES Clientes(Id),
   FechaHoraInicio DATETIME2 NOT NULL,
   FechaHoraFin DATETIME2 NOT NULL,
-  CONSTRAINT CK_Sesiones_Rango CHECK (FechaHoraInicio < FechaHoraFin)
+  Estado NVARCHAR(20) NOT NULL CONSTRAINT DF_Sesiones_Estado DEFAULT 'Agendado',
+  CONSTRAINT CK_Sesiones_Rango CHECK (FechaHoraInicio < FechaHoraFin),
+  CONSTRAINT CK_Sesiones_Estado CHECK (Estado IN ('Agendado', 'Completado', 'Cancelado'))
 );
 GO
 CREATE INDEX IX_Mediciones_ClienteFecha ON Mediciones(IdCliente, FechaMedicion DESC);

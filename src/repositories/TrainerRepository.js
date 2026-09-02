@@ -59,10 +59,18 @@ export default {
     const values = trainerId ? [trainerId] : [];
     const where = trainerId ? 'WHERE s.entrenador_id=$1' : '';
     return (await query(`SELECT s.id AS "Id", s.entrenador_id AS "IdEntrenador", s.cliente_id AS "IdCliente",
-      s.fecha_hora_inicio AS "FechaHoraInicio", s.fecha_hora_fin AS "FechaHoraFin",
+      s.fecha_hora_inicio AS "FechaHoraInicio", s.fecha_hora_fin AS "FechaHoraFin", s.estado AS "Estado",
       c.nombre_completo AS "ClienteNombre", u.nombre_completo AS "EntrenadorNombre"
       FROM sesiones_personalizadas s JOIN clientes c ON c.id=s.cliente_id
       JOIN entrenadores e ON e.id=s.entrenador_id JOIN usuarios u ON u.id=e.usuario_id
       ${where} ORDER BY s.fecha_hora_inicio DESC`, values)).rows;
+  },
+
+  async setSessionStatus(id, status, trainerId) {
+    const values = trainerId ? [status, id, trainerId] : [status, id];
+    const trainerFilter = trainerId ? 'AND entrenador_id=$3' : '';
+    return (await query(`UPDATE sesiones_personalizadas SET estado=$1
+      WHERE id=$2 AND estado='Agendado' ${trainerFilter}
+      RETURNING id`, values)).rows[0];
   }
 };

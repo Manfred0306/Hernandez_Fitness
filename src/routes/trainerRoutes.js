@@ -5,6 +5,7 @@ const router = Router();
 router.use(authenticate);
 router.get("/", C.list);
 router.get("/sesiones", C.sessions);
+router.patch("/sesiones/:id/estado", authorize("Entrenador", "Administrador"), C.setSessionStatus);
 router.post("/", authorize("Administrador"), C.create);
 router.put("/:id", authorize("Administrador"), C.update);
 router.patch("/:id/estado", authorize("Administrador"), C.setStatus);
